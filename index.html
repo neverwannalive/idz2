@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title> Гра "Данетки"</title>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font: 13px Helvetica, Arial; }
+    form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+    p {
+      font-size: 25pm;
+      font-weight: bold;
+      padding: 1%;
+      color:  white;
+      background-color:  black;
+    }
+    form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+    form button { min-width: 9%; height: 5%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+    .messages { list-style-type: none; margin: 0; padding: 0; }
+    .messages li { padding: 5px 10px; }
+    .messages li:nth-child(odd) { background: #eee; }
+    .messages { margin-bottom: 40px }
+    .initially_hidden {
+        display: none;
+    }
+    #yes, #no, #incorrect {
+      disabled: true;
+    }
+    main{
+      padding: 2px;
+    }
+    span{
+      color: rgb(255, 0, 0);
+    }
+  </style>
+</head>
+<body>
+
+<p>Кількість гравців: <span id="gamers">1</span></p>
+<main id="create_skin">
+
+  <b>Загадайте слово: </b>
+  <input id="word" type="text"></input>
+  <button id="create">Створити гру</button>
+</main>
+
+<main id="join_skin" class="initially_hidden">
+  <button id="join">Приєднатися до гри</button>
+</main>
+
+<main id="wait_skin" class="initially_hidden">
+  <p>Очікуємо початку гри</p>
+  <button id="start" class="initially_hidden">Розпочати</button>
+</main>
+
+<main id="master_skin" class="initially_hidden">
+  <p>Відповідь:<span id="answer"></span></p>
+<ul class="messages"></ul>
+<form id="ruler" action="">
+  <button id="yes">Так</button>
+  <button id="no">Ні</button>
+  <button id="incorrect">Запитання некоректне</button>
+  <button id="finish">Завершити гру</button>
+</form>
+</main>
+
+<main id="slave_skin" class="initially_hidden">
+<ul class="messages"></ul>
+<form action="" id="prompt">
+  <input id="m" autocomplete="off" /><button id="send">Send</button>
+</form>
+</main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  
+  <script>
+  var ruller = false;
+  function transform_master(){
+    $("main").hide();
+    $("#master_skin").show();
+    block();
+  }
+
+  function transform_slave(){
+    $("main").hide();
+    $("#slave_skin").show();
+  }
+
+  function transform_join(){
+    $("main").hide();
+    $("#join_skin").show();
+  }
+
+  function transform_wait(){
+    $("main").hide();
+    $("#wait_skin").show();
+    if(ruller){
+      $("#start").show();
+    }
+  }
+
+  function reset(){
+    $("main").hide();
+    $("#create_skin").show();
+    $("#start").hide();
+    $(".messages").innerHTML(" ");
+  }
+
+  function block(){
+    $("#yes, #no, #incorrect").prop("disabled",true);
+  }
+
+  $(function(){
+    var socket = io();
+    $('#prompt').submit(function(e){
+      e.preventDefault(); // prevents page reloading
+      socket.emit('send message', $('#m').val());
+      $('#m').val('');
+      $('#prompt').prop('disabled',true);
+      return false;
+    });
+    $('#create').click(function(e){
+      ruller = true;
+      var answer = $('#word').val();
+      $('#answer').text(answer);
+      socket.emit('create',$('#word').val());
+      e.preventDefault();
+      return false;
+    });
+    $('#join').click(function(e){
+      e.preventDefault();
+      socket.emit('join');
+      return false;
+    });
+    $('#start').click(function(e){
+      e.preventDefault();
+      socket.emit('start');
+      return false;
+    });
+    $('#yes').click(function(e){
+      socket.emit('yes');
+      block();
+      e.preventDefault();
+      return false;
+    });
+    $('#no').click(function(e){
+      socket.emit('no');
+      block();
+      e.preventDefault();
+      return false;
+    });
+    $('#incorrect').click(function(e){
+      socket.emit('incorrect');
+      block();
+      e.preventDefault();
+      return false;
+    });
+    $('#finish').click(function(e){
+      socket.emit('finish');
+      e.preventDefault();
+      return false;
+    });
+    socket.on('disconnect', function(msg){
+      reset();
+    });
+    socket.on('receive message', function(msg){
+      $('.messages').append($('<li>').text(msg));
+    });
+    socket.on('transform_slave',function(){
+      transform_slave();
+    });
+    socket.on('transform_wait',function(){
+      transform_wait();
+    });
+    socket.on('transform_join',function(flag){
+      ruller = flag;
+      transform_join();
+    });
+    socket.on('transform_master',function(){
+      transform_master();
+    });
+    socket.on('gamers',function(num){
+      $('#gamers').text(num);
+    });
+    socket.on('finish',function(answer){
+      alert(answer);
+      $()
+      ruller = false;
+      reset();
+    });
+    socket.on('alert',function(msg){
+      alert(msg);
+    });
+    socket.on('allow',function(){
+      $("#yes, #no, #incorrect").prop("disabled",false);
+    });
+    socket.on('allow_slave',function(){
+      $("#m, #send").prop("disabled",false);
+    });
+    socket.on('block_slave',function(){
+      $("#m, #send").prop("disabled",true);
+    });
+  });
+  </script>
+  </body>
+</html>
